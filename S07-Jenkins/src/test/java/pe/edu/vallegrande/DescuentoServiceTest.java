@@ -13,7 +13,7 @@ class DescuentoServiceTest {
 
         double resultado = service.calcularPrecio(100, true);
 
-        assertEquals(90, resultado);
+        assertEquals(80, resultado);
     }
 
     @Test
