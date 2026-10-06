@@ -10,13 +10,6 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                echo 'Checkout source code'
-                checkout scm
-            }
-        }
-
         stage('Build') {
             steps {
                 dir('PSW_Pipeline_Base') {
