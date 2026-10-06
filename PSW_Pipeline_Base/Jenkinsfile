@@ -1,0 +1,109 @@
+pipeline {
+    agent any
+
+    environment {
+        // JMeter configuration
+        JMETER_HOME = 'C:\\Program Files\\apache-jmeter-5.6.3'  // Adjust to your JMeter installation path
+        JMETER_TEST = 'jmeter-tests/pipeline-test.jmx'
+        JMETER_RESULTS = 'jmeter-results'
+        APP_URL = 'http://localhost:8085'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checkout source code'
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Building project with Maven'
+                bat 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                echo 'Running unit tests'
+                bat 'mvn test'
+            }
+            post {
+                always {
+                    jacoco execPattern: 'target/jacoco.exec'
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                echo 'Running SonarQube analysis'
+                withSonarQubeEnv('SonarQube') {
+                    bat 'mvn sonar:sonar'
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Start Application') {
+            steps {
+                echo 'Starting Spring Boot application'
+                script {
+                    // Start application in background
+                    bat 'start cmd /c mvn spring-boot:run'
+                    // Wait for application to start
+                    sleep(time: 30, unit: 'SECONDS')
+                }
+            }
+        }
+
+        stage('JMeter Tests') {
+            steps {
+                echo 'Running JMeter load tests'
+                script {
+                    bat "\"${env.JMETER_HOME}\\bin\\jmeter.bat\" -n -t ${env.JMETER_TEST} -l ${env.JMETER_RESULTS}\\results.jtl -e -o ${env.JMETER_RESULTS}\\report"
+                }
+            }
+        }
+
+        stage('Stop Application') {
+            steps {
+                echo 'Stopping Spring Boot application'
+                bat 'taskkill /F /FI "WINDOWTITLE eq mvn spring-boot:run*"'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline successful'
+            slackSend(
+                color: 'good',
+                message: "✅ Pipeline SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}\n\nSonarQube: PASSED\nJMeter: PASSED",
+                channel: '#build-notifications'
+            )
+        }
+
+        failure {
+            echo 'Pipeline failed'
+            slackSend(
+                color: 'danger',
+                message: "❌ Pipeline FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}\n\nCheck Jenkins console for details",
+                channel: '#build-notifications'
+            )
+        }
+
+        always {
+            echo 'Cleaning up workspace'
+            cleanWs()
+        }
+    }
+}
