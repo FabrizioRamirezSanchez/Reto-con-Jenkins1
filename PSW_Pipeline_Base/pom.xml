@@ -13,11 +13,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>pe.edu.vallegrande</groupId>
-    <artifactId>psw-pipeline-base</artifactId>
+    <groupId>com.pipeline.final</groupId>
+    <artifactId>psw-pipeline-final</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
-    <name>PSW Pipeline Base</name>
+    <name>Pipeline Test 2026</name>
     <description>Proyecto base para integración de Jenkins, SonarQube, JMeter y Slack</description>
 
     <properties>
