@@ -19,28 +19,36 @@ pipeline {
 
         stage('Build') {
             steps {
-                echo 'Building project with Maven'
-                bat 'mvn clean package -DskipTests'
+                dir('PSW_Pipeline_Base') {
+                    echo 'Building project with Maven'
+                    bat 'mvn clean package -DskipTests'
+                }
             }
         }
 
         stage('Unit Tests') {
             steps {
-                echo 'Running unit tests'
-                bat 'mvn test'
+                dir('PSW_Pipeline_Base') {
+                    echo 'Running unit tests'
+                    bat 'mvn test'
+                }
             }
             post {
                 always {
-                    jacoco execPattern: 'target/jacoco.exec'
+                    dir('PSW_Pipeline_Base') {
+                        jacoco execPattern: 'target/jacoco.exec'
+                    }
                 }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                echo 'Running SonarQube analysis'
-                withSonarQubeEnv('SonarQube') {
-                    bat 'mvn sonar:sonar'
+                dir('PSW_Pipeline_Base') {
+                    echo 'Running SonarQube analysis'
+                    withSonarQubeEnv('SonarQube') {
+                        bat 'mvn sonar:sonar'
+                    }
                 }
             }
         }
@@ -55,12 +63,14 @@ pipeline {
 
         stage('Start Application') {
             steps {
-                echo 'Starting Spring Boot application'
-                script {
-                    // Start application in background
-                    bat 'start cmd /c mvn spring-boot:run'
-                    // Wait for application to start
-                    sleep(time: 30, unit: 'SECONDS')
+                dir('PSW_Pipeline_Base') {
+                    echo 'Starting Spring Boot application'
+                    script {
+                        // Start application in background
+                        bat 'start cmd /c mvn spring-boot:run'
+                        // Wait for application to start
+                        sleep(time: 30, unit: 'SECONDS')
+                    }
                 }
             }
         }
@@ -69,7 +79,7 @@ pipeline {
             steps {
                 echo 'Running JMeter load tests'
                 script {
-                    bat "\"${env.JMETER_HOME}\\bin\\jmeter.bat\" -n -t ${env.JMETER_TEST} -l ${env.JMETER_RESULTS}\\results.jtl -e -o ${env.JMETER_RESULTS}\\report"
+                    bat "\"${env.JMETER_HOME}\\bin\\jmeter.bat\" -n -t PSW_Pipeline_Base/jmeter-tests/pipeline-test.jmx -l PSW_Pipeline_Base/jmeter-results/results.jtl -e -o PSW_Pipeline_Base/jmeter-results/report"
                 }
             }
         }
@@ -85,19 +95,20 @@ pipeline {
     post {
         success {
             echo 'Pipeline successful'
-            slackSend(
-                color: 'good',
-                message: "✅ Pipeline SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}\n\nSonarQube: PASSED\nJMeter: PASSED",
-                channel: '#build-notifications'
+            // Slack plugin not installed, using email instead
+            emailext(
+                subject: "✅ Pipeline SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: "Pipeline completed successfully.\n\nSonarQube: PASSED\nJMeter: PASSED",
+                to: 'admin@example.com'
             )
         }
 
         failure {
             echo 'Pipeline failed'
-            slackSend(
-                color: 'danger',
-                message: "❌ Pipeline FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}\n\nCheck Jenkins console for details",
-                channel: '#build-notifications'
+            emailext(
+                subject: "❌ Pipeline FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                body: "Pipeline failed. Check Jenkins console for details.",
+                to: 'admin@example.com'
             )
         }
 
